@@ -7,3 +7,6 @@ data/processed/
 *.pt
 *.pth
 *.ckpt
+requirements.txt
+.venv/
+.idea/

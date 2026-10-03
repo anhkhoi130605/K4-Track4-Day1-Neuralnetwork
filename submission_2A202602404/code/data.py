@@ -10,13 +10,14 @@ Quy ước dữ liệu (xem README mục 2 và 3):
 Tập eval CHỈ dùng để chấm điểm cuối. Không dùng nó để chọn cấu hình, chuẩn hoá hay dừng sớm.
 """
 from __future__ import annotations
-
 import numpy as np
+import pandas as pd
 import torch
-
+from pathlib import Path
+from sklearn.model_selection import train_test_split
 N_NUMERIC = 10  # số cột liên tục cần chuẩn hoá (cột 0..9)
 
-
+ROOT = Path(__file__).resolve().parents[2]
 def load_split(processed_dir: str = "data/processed"):
     """Nạp train và eval từ file .npz.
 
@@ -26,7 +27,16 @@ def load_split(processed_dir: str = "data/processed"):
       2. np.load(f"{processed_dir}/eval.npz")  -> khoá "X", "y", "row_id"
       3. assert shape/dtype đúng quy ước ở đầu file
     """
-    raise NotImplementedError  # TODO
+    training_data=np.load(f"{processed_dir}/train.npz")
+    eval_data=np.load(f"{processed_dir}/eval.npz")
+    X_train_full = training_data["X"]
+    y_train_full = training_data["y"]
+    X_eval = eval_data["X"]
+    y_eval = eval_data["y"]
+    eval_row_id = eval_data["row_id"]
+    assert X_train_full.shape[1] == 54 and X_eval.shape[1] == 54
+    assert y_train_full.dtype == np.int64 and y_eval.dtype == np.int64
+    return X_train_full, y_train_full, X_eval, y_eval, eval_row_id
 
 
 def make_val_split(X, y, val_fraction: float = 0.2, seed: int = 42):
@@ -36,7 +46,8 @@ def make_val_split(X, y, val_fraction: float = 0.2, seed: int = 42):
     Gợi ý: sklearn.model_selection.train_test_split(..., stratify=y, random_state=seed)
     Dùng CÙNG seed và val_fraction cho mọi thí nghiệm để so sánh công bằng.
     """
-    raise NotImplementedError  # TODO
+    X_tr, X_val, y_tr, y_val = train_test_split(X, y, test_size=val_fraction, stratify=y, random_state=seed)
+    return X_tr, y_tr, X_val, y_val
 
 
 def fit_standardizer(X_tr):
@@ -45,7 +56,10 @@ def fit_standardizer(X_tr):
     Trả về: mean (shape (10,)), std (shape (10,))
     Câu hỏi: vì sao không được tính trên toàn bộ dữ liệu hay trên eval?
     """
-    raise NotImplementedError  # TODO
+    mean = np.mean(X_tr[:, :N_NUMERIC], axis=0)
+    std = np.std(X_tr[:, :N_NUMERIC], axis=0)
+    return mean, std
+    #nếu tính trên toàn bộ dữ liệu thì sẽ không có tập dữ liệu để validate, còn nếu tính trên cả tập test thì sẽ bị hiện tương data leakeage
 
 
 def apply_standardizer(X, mean, std):
@@ -81,4 +95,46 @@ def iterate_batches(X, y, batch_size: int, generator: torch.Generator | None = N
     Chú ý: batch cuối có thể nhỏ hơn batch_size; hãy quyết định bạn xử lý thế nào và ghi lại.
     """
     raise NotImplementedError  # TODO
+if __name__ == '__main__':
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', 1000)
+    processed_path = ROOT / "data" / "processed"
 
+    X_train_full, y_train_full, X_eval, y_eval, eval_row_id = load_split(processed_dir=processed_path)
+
+    # print("=== 5 dòng đầu của tập train ===")
+    # df = pd.DataFrame(X_train_full[:5])
+    # df["target"] = y_train_full[:5]
+    # print(df)
+    #
+    # print("\nKích thước X_train_full:", X_train_full.shape)
+    # print("Kích thước y_train_full:", y_train_full.shape)
+
+    # classes = np.unique(y_train_full)
+    # print("Danh sách các class:", classes)
+    # print("Tổng số lượng class:", len(classes))
+    #
+    # classes, counts = np.unique(y_train_full, return_counts=True)
+    # for c, cnt in zip(classes, counts):
+    #     print(f"Class {c}: {cnt} mẫu")   7 Class
+    # print("1. Kiểu dữ liệu (dtype):", X_train_full.dtype)
+
+    ratio_full = pd.Series(y_train_full).value_counts(normalize=True).sort_index() * 100
+    ratio_tr = pd.Series(y_train_full).value_counts(normalize=True).sort_index() * 100
+    ratio_val = pd.Series(y_eval).value_counts(normalize=True).sort_index() * 100
+
+    # 2. Tính số lượng mẫu cụ thể ở mỗi tập
+    count_tr = pd.Series(y_train_full).value_counts().sort_index()
+    count_val = pd.Series(y_eval).value_counts().sort_index()
+
+    # 3. Tạo bảng tổng hợp để xem
+    df_compare = pd.DataFrame({
+        'Số lượng Train': count_tr,
+        'Tỷ lệ Train (%)': ratio_tr.round(2),
+        'Số lượng Val': count_val,
+        'Tỷ lệ Val (%)': ratio_val.round(2),
+        'Tỷ lệ Gốc (%)': ratio_full.round(2)
+    })
+
+    print("=== SO SÁNH PHÂN PHỐI CLASS TRƯỚC VÀ SAU KHI STRATIFY ===")
+    print(df_compare)
