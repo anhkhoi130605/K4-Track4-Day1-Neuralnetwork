@@ -28,7 +28,20 @@ def build_optimizer(name: str, params, lr: float, weight_decay: float = 0.0,
          "adamw"        -> torch.optim.AdamW(params, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
     Chú ý: weight_decay của Adam (L2 trộn vào gradient) khác weight_decay của AdamW (suy giảm tách riêng).
     """
-    raise NotImplementedError  # TODO
+    name = name.lower()
+    if name not in OPTIMIZERS:
+        raise ValueError(f"Unsupported optimizer: {name}. Expected one of {OPTIMIZERS}")
+
+    if name == "sgd":
+        return torch.optim.SGD(params, lr=lr, weight_decay=weight_decay)
+    if name == "sgd_momentum":
+        return torch.optim.SGD(params, lr=lr, momentum=momentum, weight_decay=weight_decay)
+    if name == "adam":
+        return torch.optim.Adam(params, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+    if name == "adamw":
+        return torch.optim.AdamW(params, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
+
+    raise ValueError(f"Unsupported optimizer: {name}")
 
 
 def build_scheduler(optimizer, name: str | None, total_steps: int, **kwargs):
@@ -36,17 +49,52 @@ def build_scheduler(optimizer, name: str | None, total_steps: int, **kwargs):
 
     Trả về None nếu name là None. Nếu bạn dùng scheduler ở một thí nghiệm, hãy ghi vào bảng (cột notes).
     """
-    raise NotImplementedError  # TODO
+    if name is None:
+        return None
+
+    name = name.lower()
+    if name == "cosine":
+        from torch.optim.lr_scheduler import CosineAnnealingLR
+        return CosineAnnealingLR(optimizer, T_max=max(1, total_steps), **kwargs)
+    if name == "step":
+        from torch.optim.lr_scheduler import StepLR
+        return StepLR(optimizer, step_size=max(1, kwargs.get("step_size", 1)), gamma=kwargs.get("gamma", 0.1))
+    if name == "linear":
+        from torch.optim.lr_scheduler import LambdaLR
+        if "warmup_steps" in kwargs:
+            warmup_steps = max(0, int(kwargs["warmup_steps"]))
+            total = max(1, total_steps)
+
+            def lr_lambda(epoch):
+                if epoch < warmup_steps:
+                    return (epoch + 1) / max(1, warmup_steps)
+                progress = (epoch - warmup_steps) / max(1, total - warmup_steps)
+                return max(0.0, 1.0 - progress)
+
+            return LambdaLR(optimizer, lr_lambda)
+
+        return LambdaLR(optimizer, lambda step: 1.0)
+
+    raise ValueError(f"Unsupported scheduler: {name}")
 
 
 def clip_gradients(params, max_norm: float | None) -> float:
     """Cắt gradient theo chuẩn L2 toàn cục, và TRẢ VỀ chuẩn gradient TRƯỚC KHI cắt.
 
     Các bước:
-      1. nếu max_norm là None: tính chuẩn toàn cục mà không cắt (ví dụ clip_grad_norm_ với max_norm=inf)
+      1. nếu max_norm là None: tính chuẩn toàn cục mà không cắt
       2. ngược lại: total_norm = torch.nn.utils.clip_grad_norm_(params, max_norm)
       3. return float(total_norm)
     Giá trị trả về chính là `grad_norm` bạn phải ghi lại ở mỗi bước (để thấy "gai" gradient).
     Khi dùng mixed precision FP16 + GradScaler: phải scaler.unscale_(optimizer) TRƯỚC khi gọi hàm này.
     """
-    raise NotImplementedError  # TODO
+    grads = [p.grad for p in params if p.grad is not None]
+    if len(grads) == 0:
+        return 0.0
+
+    if max_norm is None:
+        total_norm = torch.norm(torch.stack([g.detach().norm(2) for g in grads]), p=2)
+        return float(total_norm.item())
+
+    total_norm = torch.nn.utils.clip_grad_norm_(params, max_norm=max_norm)
+    return float(total_norm)

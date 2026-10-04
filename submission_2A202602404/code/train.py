@@ -7,16 +7,21 @@ Mọi chỉ số (loss, accuracy, macro-F1) dùng cùng định nghĩa với scr
 """
 from __future__ import annotations
 
+import os
+import random
 import time
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from argparse import ArgumentParser
+from tqdm.autonotebook import tqdm
 from data import iterate_batches
+from torch.utils.tensorboard import SummaryWriter
 from model import MLP, EXPECTED_PARAMS, count_params
 from optimizer import build_optimizer, clip_gradients
-
+import shutil
 # Cấu hình mặc định = BASELINE (M-base). `lr` do bạn tự chọn bằng val rồi điền vào.
 DEFAULT_CFG = dict(
     exp_id="base-s1", group="baseline", description="Baseline M-base",
@@ -31,10 +36,33 @@ DEFAULT_CFG = dict(
     seed=1,
 )
 
-
+def get_args():
+    parser = ArgumentParser(description="Neural Network training")
+    parser.add_argument("--root", "-r", type=str, default="./data", help="Root of the dataset")
+    parser.add_argument("--epochs", "-e", type=int, default=100, help="Number of epochs")
+    parser.add_argument("--batch-size", "-b", type=int, default=32, help="Batch size")
+    parser.add_argument("--logging", "-l", type=str, default="tensorboard")
+    parser.add_argument("--trained_models", "-t", type=str, default="trained_models")
+    parser.add_argument("--checkpoint", "-c", type=str, default=None)
+    args = parser.parse_args()
+    return args
 def set_seed(seed: int) -> None:
     """Đặt seed cho random, numpy, torch (và torch.cuda nếu có)."""
-    raise NotImplementedError  # TODO
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+    # 2. NumPy
+    np.random.seed(seed)
+
+    # 3. PyTorch (CPU & all GPUs)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+
+        # Đảm bảo tính tất định cho các thuật toán tích chập / nhân ma trận (cuDNN)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 
 def macro_f1_from_confusion(cm: np.ndarray) -> float:

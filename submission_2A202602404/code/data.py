@@ -139,9 +139,9 @@ def iterate_batches(X, y, batch_size: int, generator: torch.Generator | None = N
     Chú ý: batch cuối có thể nhỏ hơn batch_size; hãy quyết định bạn xử lý thế nào và ghi lại.
     """
     if shuffle:
-        perm = torch.randperm(len(X), generator=generator, device=X.device)
+        perm = torch.randperm(len(X), generator=generator, device=X.device) #tensor 1D hoán vị ngẫu nhiên từ 0 đến len(X)-1
     else :
-        perm = torch.arange(len(X), generator=generator, device=X.device)
+        perm = torch.arange(len(X), device=X.device) #tensor 1D tuần tự từ 0 đến len(X)-1 trên tập dữ liệu ban đầu
     for i in range(0, len(X), batch_size):
         idx = perm[i:i + batch_size]
         yield X[idx], y[idx]
@@ -206,7 +206,7 @@ if __name__ == '__main__':
 # Process finished with exit code 0
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # 1. Gọi hàm chuẩn bị dữ liệu
 # data = prepare_data(device=device)

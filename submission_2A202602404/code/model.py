@@ -33,22 +33,33 @@ class MLP(nn.Module):
         init:     "zeros" | "normal" | "xavier" | "he" | "default"
     """
 
-    def __init__(self, hidden=(256, 128), dropout: float = 0.0, init: str = "he",
+    def __init__(self, hidden=(256, 128), dropout: float = 0.2, init: str = "he",
                  in_features: int = 54, num_classes: int = 7):
         super().__init__()
+        self.flatten = nn.Flatten()
         # TODO các bước:
         #   1. dựng danh sách lớp: với mỗi h trong hidden: Linear(in, h), ReLU, Dropout(dropout)
         #   2. thêm Linear(h_cuối, num_classes) làm lớp ra
         #   3. gộp bằng nn.Sequential (hoặc tự viết forward), lưu vào self.net
         #   4. gọi init_weights(self, init)
-        raise NotImplementedError
+        layers = []
+        prev_features = in_features
+        for h in hidden:
+            layers.append(nn.Linear(in_features=prev_features, out_features=h))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(p=dropout))
+            prev_features = h
+        layers.append(nn.Linear(in_features=prev_features, out_features=num_classes))
+        self.net = nn.Sequential(*layers)
+        init_weights(self, init)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """x: (B, 54) float32  ->  logits: (B, 7) float32."""
-        raise NotImplementedError  # TODO
+        X = self.net(x)
+        return X
 
 
-def init_weights(model: nn.Module, init: str) -> None:
+def init_weights(model: nn.Module, init: str) -> None: #khởi tạo ma trận trọng số W
     """Khởi tạo tham số của MỌI nn.Linear (bias luôn = 0).
 
     init:
@@ -59,13 +70,28 @@ def init_weights(model: nn.Module, init: str) -> None:
         "default" : không làm gì (giữ khởi tạo mặc định của nn.Linear; KHÔNG phải He)
     Gợi ý: duyệt model.modules(), chọn isinstance(m, nn.Linear).
     """
-    raise NotImplementedError  # TODO
-
+    for m in model.modules():
+        if isinstance(m, nn.Linear): #m hiện tại có phải là một lớp tuyến tính (nn.Linear) hay không?
+            if init == "zeros":#Đặt toàn bộ ma trận W = 0.
+                nn.init.zeros_(m.weight)
+            elif init == "normal": #Khởi tạo W theo phân phối chuẩn
+                nn.init.normal_(m.weight, 0, 0.01)
+            elif init == "xavier": #Khởi tạo W theo thuật toán Xavier / Glorot
+                nn.init.xavier_normal_(m.weight)
+            elif init == "he": #Khởi tạo W theo He / Kaiming (tối ưu cho ReLU)
+                nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
+            elif init == "default": #Giữ nguyên W mặc định của PyTorch
+                # Giữ nguyên khởi tạo mặc định của PyTorch (Kaiming uniform)
+                pass
+            else:
+                raise ValueError(f"none init weight: {init}")
+            if m.bias is not None: #khởi tạo bias=0
+                nn.init.zeros_(m.bias)
 
 def count_params(model: nn.Module) -> int:
     """Tổng số tham số huấn luyện được. Dùng để assert với EXPECTED_PARAMS ngay sau khi tạo model."""
-    raise NotImplementedError  # TODO
-
+    assert sum(p.numel() for p in model.parameters()) == EXPECTED_PARAMS.get(model.hidden_shape, 0), f"Number of parameters does not match expected value for model with hidden shape {model.hidden_shape}"
+    return sum(p.numel() for p in model.parameters())
 
 @torch.no_grad()
 def activation_stats(model: nn.Module, x: torch.Tensor) -> list[float]:
@@ -76,4 +102,21 @@ def activation_stats(model: nn.Module, x: torch.Tensor) -> list[float]:
       2. duyệt từng lớp con theo thứ tự; sau mỗi nn.Linear (hoặc sau mỗi ReLU, bạn chọn và ghi rõ) lưu h.std().item()
       3. trả về danh sách std theo lớp
     """
-    raise NotImplementedError  # TODO
+    model.eval()
+    h = x
+    std =[]
+    # Duyệt tuần tự qua từng lớp bên trong self.net
+    layers = model.net if hasattr(model, "net") else model
+    for layer in layers:
+        h = layer(h)
+        if isinstance(layer, nn.Linear):
+            std.append(h.std().item())
+    return std
+if __name__ == "__main__":
+    for hidden_shape, expected_count in EXPECTED_PARAMS.items():
+        model = MLP(hidden=hidden_shape)
+        actual_count = sum(p.numel() for p in model.parameters())
+        print(f"Kiến trúc {hidden_shape}: Thực tế={actual_count}, Kỳ vọng={expected_count}")
+        # Kiến trúc(256, 128): Thực tế = 47879, Kỳ vọng = 47879
+        # Kiến trúc(512, 256): Thực tế = 161287, Kỳ vọng = 161287
+        # Kiến trúc(256, 128, 64): Thực tế = 55687, Kỳ vọng = 55687
