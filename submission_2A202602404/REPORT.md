@@ -1,6 +1,6 @@
 # Báo cáo Lab Day 1 — Mạng Nơ-ron và Huấn Luyện (Forest CoverType)
 
-**Học viên:** Nguyễn Anh Khôi — **MSSV:** 2A202602404  
+**Học viên:** Phạm Hoàng Anh Khôi — **MSSV:** 2A202602404  
 **Khóa học:** Track 4 · Ngày 1 · VinUniversity AICB 2026  
 
 ---
