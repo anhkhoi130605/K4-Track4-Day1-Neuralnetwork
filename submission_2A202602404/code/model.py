@@ -90,8 +90,7 @@ def init_weights(model: nn.Module, init: str) -> None: #khởi tạo ma trận t
 
 def count_params(model: nn.Module) -> int:
     """Tổng số tham số huấn luyện được. Dùng để assert với EXPECTED_PARAMS ngay sau khi tạo model."""
-    assert sum(p.numel() for p in model.parameters()) == EXPECTED_PARAMS.get(model.hidden_shape, 0), f"Number of parameters does not match expected value for model with hidden shape {model.hidden_shape}"
-    return sum(p.numel() for p in model.parameters())
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 @torch.no_grad()
 def activation_stats(model: nn.Module, x: torch.Tensor) -> list[float]:

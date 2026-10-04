@@ -10,3 +10,8 @@ data/processed/
 requirements.txt
 .venv/
 .idea/
+tensorboard/
+trained_models/
+data/
+runs/
+results/

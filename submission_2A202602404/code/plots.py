@@ -30,12 +30,12 @@ def plot_run(result: dict[str, Any], path: str) -> None:
     )
     fig.suptitle(f"Experiment: {exp_id}\n({cfg_text})", fontsize=13, y=1.03)
 
-    train_loss = result.get("train_loss", [])
-    val_loss = result.get("val_loss", [])
-    val_acc = result.get("val_acc", [])
-    val_macro_f1 = result.get("val_macro_f1", [])
-    grad_norm = result.get("grad_norm", [])
-    best_epoch = result.get("best_epoch", None)
+    train_loss = result.get("train_loss") or result.get("history", {}).get("train_loss", [])
+    val_loss = result.get("val_loss") or result.get("history", {}).get("val_loss", [])
+    val_acc = result.get("val_acc") or result.get("history", {}).get("val_acc", [])
+    val_macro_f1 = result.get("val_macro_f1") or result.get("history", {}).get("val_macro_f1", [])
+    grad_norm = result.get("grad_norm") or result.get("history", {}).get("grad_norm", [])
+    best_epoch = result.get("best_epoch") or result.get("summary", {}).get("best_epoch")
 
     epochs = range(1, len(train_loss) + 1)
 
@@ -119,6 +119,8 @@ def plot_compare(
     for res in results:
         exp_id = res.get("exp_id", "Unknown")
         values = res.get(metric, [])
+        if not values and "history" in res:
+            values = res["history"].get(metric, [])
         if values:
             epochs = range(1, len(values) + 1)
             ax.plot(epochs, values, marker="o", markersize=3, label=exp_id)

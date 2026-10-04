@@ -92,7 +92,7 @@ def apply_standardizer(X, mean, std):
 
 
 def prepare_data(device: str, val_fraction: float = 0.2, seed: int = 42,
-                 processed_dir: str = "data/processed") -> dict:
+                 processed_dir: str = "data/processed", pin_memory: bool = True) -> dict:
     """Gộp các bước trên và đưa TOÀN BỘ dữ liệu lên `device` một lần (không dùng DataLoader).
 
     Trả về dict gồm các tensor trên device:
@@ -119,6 +119,16 @@ def prepare_data(device: str, val_fraction: float = 0.2, seed: int = 42,
 
     X_eval_t = torch.tensor(X_eval, dtype=torch.float32, device=device)
     y_eval_t = torch.tensor(y_eval, dtype=torch.int64, device=device)
+
+    # Nếu dữ liệu ở CPU và máy có GPU, kích hoạt pin_memory để chuyển sang GPU siêu tốc
+    if pin_memory and str(device).lower() == "cpu" and torch.cuda.is_available():
+        X_tr_t = X_tr_t.pin_memory()
+        y_tr_t = y_tr_t.pin_memory()
+        X_val_t = X_val_t.pin_memory()
+        y_val_t = y_val_t.pin_memory()
+        X_eval_t = X_eval_t.pin_memory()
+        y_eval_t = y_eval_t.pin_memory()
+
     return {
         "X_tr": X_tr_t,
         "y_tr": y_tr_t,

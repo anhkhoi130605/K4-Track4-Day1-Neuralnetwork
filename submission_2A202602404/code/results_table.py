@@ -41,7 +41,16 @@ def save_result(result: dict, results_dir: str = "../results") -> str:
 
 def load_results(results_dir: str = "../results") -> list[dict]:
     """Đọc mọi file *.json trong results_dir, trả về danh sách dict (sắp theo exp_id)."""
-    raise NotImplementedError  # TODO
+    p = Path(results_dir)
+    if not p.exists():
+        return []
+    results = []
+    for f in sorted(p.glob("*.json")):
+        with open(f, "r", encoding="utf-8") as fp:
+            data = json.load(fp)
+            results.append(data)
+    results.sort(key=lambda r: r.get("cfg", {}).get("exp_id", r.get("exp_id", "")))
+    return results
 
 
 def to_row(result: dict, eval_scores: dict | None = None, notes: str = "") -> dict:
